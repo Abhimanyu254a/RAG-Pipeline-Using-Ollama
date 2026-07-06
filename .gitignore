@@ -1,4 +1,4 @@
-﻿# TruLens database — contains serialized API keys from run history
+# TruLens database � contains serialized API keys from run history
 *.sqlite
 default.sqlite
 
@@ -19,7 +19,7 @@ env/
 
 # Environment variables
 .env
-.env.*
+.env
 
 # OS
 .DS_Store
