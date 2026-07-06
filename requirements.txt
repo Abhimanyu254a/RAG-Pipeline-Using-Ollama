@@ -1,0 +1,34 @@
+﻿# ─────────────────────────────────────────────────────────────
+# RAG Application — Requirements
+# Python 3.9+
+# ─────────────────────────────────────────────────────────────
+
+# ── LlamaIndex core (v0.10+ modular API) ─────────────────────
+llama-index-core>=0.10.0
+llama-index-llms-openai>=0.1.0          # OpenAI LLM integration
+llama-index-embeddings-huggingface>=0.2.0  # Local HuggingFace embed models
+llama-index-readers-file>=0.1.0         # SimpleDirectoryReader / PDF loader
+llama-index-postprocessor-flag-embedding-reranker>=0.1.0  # BGE cross-encoder reranker
+
+# ── OpenAI SDK ────────────────────────────────────────────────
+openai>=1.0.0
+
+# ── HuggingFace / Sentence Transformers (for local embeddings & reranking) ──
+sentence-transformers>=2.2.0
+transformers>=4.35.0
+torch>=2.0.0                            # Required by sentence-transformers
+
+# ── TruLens (v1.x — replaces old trulens_eval package) ───────
+trulens>=1.0.0
+trulens-apps-llamaindex>=1.0.0
+trulens-providers-openai>=1.0.0
+
+# ── PDF parsing ───────────────────────────────────────────────
+pypdf>=3.0.0
+
+# ── Numerical / Data ──────────────────────────────────────────
+numpy>=1.24.0
+
+# ── Jupyter (for running the notebooks) ──────────────────────
+jupyter>=1.0.0
+ipywidgets>=8.0.0                       # Required for TruLens dashboard widget
