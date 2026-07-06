@@ -1,49 +1,276 @@
-# Retrieval Augmented Generation (RAG) Application using LLMs
+﻿<div align="center">
 
-## Overview
-Welcome to the Retrieval Augmented Generation (RAG) project! This repository contains the implementation of advanced retrieval methods to enhance the integration of large language models (LLMs) with proprietary data. The primary goal is to improve the coherence and performance of the RAG pipeline through two advanced retrieval methods: Sentence-window retrieval and Auto-merging retrieval.
+# 🔍 Advanced RAG Application with LLMs
 
-## Files
-**Medical_Cost_Prediction.pdf**: This is the pdf used to query information, it contains details about one of my previous projects - Medical Cost Prediction using Machine Learning for AWS Deployment.
+### Sentence-Window & Auto-Merging Retrieval · TruLens Evaluation · LlamaIndex v0.10+
 
-**RAG_Pipeline.ipynb**: Jupyter notebook that encompasses the implementation of the basic RAG pipeline, which serves as the baseline for comparing and evaluating the advanced RAG techniques.
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![LlamaIndex](https://img.shields.io/badge/LlamaIndex-v0.10%2B-FF6F61?style=for-the-badge)](https://docs.llamaindex.ai)
+[![TruLens](https://img.shields.io/badge/TruLens-v1.x-7C3AED?style=for-the-badge)](https://www.trulens.org)
+[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o%20mini-412991?style=for-the-badge&logo=openai&logoColor=white)](https://platform.openai.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
 
-**automerging_retrieval.ipynb**: Jupyter Notebook focusing on the implementation and details of the auto-merging retrieval method. This file provides insights into how this method enhances the baseline RAG pipeline.
+</div>
 
-**sentence_window_retrieval.ipynb**: Jupyter notebook dedicated to the implementation and details of the sentence-window retrieval method. It elaborates on how this retrieval method contributes to improving the RAG pipeline.
+---
 
-**utils.py**: A Python script containing utility functions and helper methods used across notebooks. This file is crucial for the modular and organized implementation of the project.
+## 📌 What This Project Does
 
-**default.sqlite**: A SQLite database file, possibly storing relevant data or configurations needed for the project. Please refer to the specific notebooks to understand their usage.
+This project implements and **benchmarks two advanced Retrieval-Augmented Generation (RAG) techniques** on top of a baseline RAG pipeline, using the **LlamaIndex** framework and **OpenAI LLMs**. All three pipelines are objectively evaluated using the **RAG Triad** (Answer Relevance, Context Relevance, Groundedness) via **TruLens**.
 
-**questions.txt**: A text file containing evaluation questions. These questions are used for assessing the performance of the RAG pipeline, based on the RAG triad: Context Relevance, Groundedness, and Answer Relevance.
+The core idea: standard RAG pipelines often retrieve too little context (narrow chunks) or too much noise (large chunks). This project explores two smarter retrieval strategies that adaptively surface the *right* amount of context.
 
-## Evaluating and Experiment Tracking
-To evaluate and iteratively improve the RAG pipeline's performance, follow these steps:
+---
 
-Run each notebook in the project structure and focus on TruLens Evaluation and the parameters used.
+## 🧠 System Architecture
 
-Sentence-Window Retrieval - Concentrate on the window size, which indicates the number of sentences preceding and following a particular sentence that should be taken into account to provide sufficient context.
+```
+┌──────────────────────────────────────────────────────────┐
+│                     INPUT DOCUMENT(S)                    │
+│                  Medical_Cost_Prediction.pdf             │
+└─────────────────────────┬────────────────────────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+   ┌─────────────┐ ┌─────────────┐ ┌──────────────┐
+   │  Baseline   │ │  Sentence   │ │    Auto-     │
+   │    RAG      │ │   Window    │ │   Merging    │
+   │  Pipeline   │ │  Retrieval  │ │  Retrieval   │
+   └──────┬──────┘ └──────┬──────┘ └──────┬───────┘
+          │               │               │
+          └───────────────┼───────────────┘
+                          ▼
+              ┌─────────────────────┐
+              │   TruLens Eval      │
+              │  (RAG Triad Score)  │
+              │  · Answer Relevance │
+              │  · Context Relevance│
+              │  · Groundedness     │
+              └─────────────────────┘
+```
 
-Auto-Merging Retrieval - Focus on the depth of the tree; the greater the number of layers, the fewer tokens in the leaf nodes (only nodes are used in constructing a VectorStore Index), resulting in lower costs for the Language Model (LLM).
+---
 
-## Contribution Guidelines
-If you wish to contribute to the project, please follow these guidelines:
+## 🔬 The Three Pipelines Explained
 
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Make changes and ensure the code is well-documented.
-4. Submit a pull request, explaining the changes and improvements.
+### 1️⃣ Baseline RAG Pipeline (`RAG_Pipeline.ipynb`)
 
-Thank you for contributing to the Retrieval Augmented Generation (RAG) project!
+The standard Ingestion → Retrieval → Synthesis pipeline:
 
-## Authors   
-- Anirudh Nuti - *Initial Work* - [NVK Anirudh](https://github.com/NvkAnirudh)
+| Stage | What Happens |
+|-------|-------------|
+| **Ingestion** | PDF is split into fixed-size chunks → embedded via `BAAI/bge-small-en-v1.5` → stored in a `VectorStoreIndex` |
+| **Retrieval** | User query is embedded → Top-K most similar chunks are fetched |
+| **Synthesis** | Retrieved chunks + query are passed to the LLM for a final answer |
 
-## License
-This project is licensed under the MIT License - see the [LICENSE.md](https://github.com/NvkAnirudh/RAG_Application_Using_LLMs/blob/main/LICENSE) file for details
+> **Limitation:** Fixed-size chunks can cut sentences mid-thought, losing context at boundaries.
 
-## Acknowledgements
-This project serves as a practical exercise from the [course](https://www.deeplearning.ai/short-courses/building-evaluating-advanced-rag/)
+---
 
+### 2️⃣ Sentence-Window Retrieval (`sentence_window_retrieval.ipynb`)
 
+**Core idea:** Index at the *sentence* level (precision), but retrieve with *surrounding context* (recall).
+
+```
+Document → [S1] [S2] [S3] [S4] [S5] [S6] [S7]
+                                             ↑ query matches S4
+Retrieval window (size=3): [S3] [S4] [S5]  ← LLM sees this wider context
+```
+
+**How it works:**
+1. `SentenceWindowNodeParser` splits each document into individual sentences
+2. Each sentence node stores its surrounding ±N sentences in metadata as a `window`
+3. At retrieval time, the `MetadataReplacementPostProcessor` replaces the narrow sentence with the full window
+4. `SentenceTransformerRerank` (cross-encoder) re-scores the candidates for maximum precision
+
+**Key parameter to tune:** `window_size` — more context vs. more noise trade-off.
+
+---
+
+### 3️⃣ Auto-Merging Retrieval (`automerging_retrieval.ipynb`)
+
+**Core idea:** Build a *tree* of chunks. Retrieve small leaves (precision), but merge into parents when evidence converges (richer context, fewer LLM tokens).
+
+```
+Layer 1 (2048 tok): [════════════ Parent ════════════]
+Layer 2  (512 tok): [══ Child-A ══] [══ Child-B ══] [══ Child-C ══]
+Layer 3  (128 tok): [L1][L2][L3]   [L4][L5][L6]   [L7][L8][L9]
+                     ↑ VectorStore only indexes leaf nodes (128-token)
+```
+
+**How it works:**
+1. `HierarchicalNodeParser` creates a 3-level chunk tree (2048 → 512 → 128 tokens)
+2. Only **leaf nodes** (128 tokens) are embedded in the `VectorStoreIndex`
+3. `AutoMergingRetriever` checks: if enough sibling leaves are retrieved, it swaps them for their shared parent chunk
+4. `SentenceTransformerRerank` re-scores the final merged result
+
+**Key parameter to tune:** `chunk_sizes` — more layers = smaller leaves = lower LLM cost.
+
+---
+
+## 📊 Evaluation: The RAG Triad
+
+All pipelines are evaluated using [TruLens](https://www.trulens.org/) with three feedback functions powered by an LLM-as-judge:
+
+| Metric | Measures | Direction |
+|--------|----------|-----------|
+| **Answer Relevance** | Does the response actually answer the question? | input → output |
+| **Context Relevance** | Are the retrieved chunks relevant to the question? | input → retrieved nodes |
+| **Groundedness** | Is every claim in the answer supported by context? | retrieved nodes → output |
+
+```python
+# Run the TruLens dashboard to compare all experiments
+tru.run_dashboard()  # Opens at http://localhost:8501
+```
+
+---
+
+## 🗂️ Project Structure
+
+```
+RAG_Application_Using_LLM/
+│
+├── RAG_Pipeline.ipynb              # Baseline RAG — ingestion, retrieval, synthesis
+├── sentence_window_retrieval.ipynb # Advanced: Sentence-Window technique + evaluation
+├── automerging_retrieval.ipynb     # Advanced: Auto-Merging technique + evaluation
+│
+├── utils.py                        # Shared helper functions (indexes, query engines,
+│                                   # TruLens recorder) — modern LlamaIndex v0.10+ API
+│
+├── Medical_Cost_Prediction.pdf     # Source document (used as the knowledge base)
+├── eval_questions.txt              # 10 evaluation questions for TruLens benchmarking
+└── default.sqlite                  # TruLens experiment results database
+```
+
+---
+
+## ⚙️ Setup & Installation
+
+### Prerequisites
+- Python 3.9+
+- An OpenAI API key
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/<your-username>/RAG_Application_Using_LLM.git
+cd RAG_Application_Using_LLM
+```
+
+### 2. Create a virtual environment
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+```bash
+pip install llama-index llama-index-llms-openai llama-index-embeddings-huggingface \
+            llama-index-postprocessor-flag-embedding-reranker \
+            trulens trulens-apps-llamaindex trulens-providers-openai \
+            sentence-transformers pypdf
+```
+
+### 4. Set your OpenAI API key
+```bash
+# Windows (PowerShell)
+$env:OPENAI_API_KEY = "sk-..."
+
+# macOS / Linux
+export OPENAI_API_KEY="sk-..."
+```
+
+### 5. Run the notebooks
+Open and run the notebooks in this order:
+1. `RAG_Pipeline.ipynb` — establish the baseline
+2. `sentence_window_retrieval.ipynb` — try Sentence-Window RAG
+3. `automerging_retrieval.ipynb` — try Auto-Merging RAG
+
+Then open the TruLens dashboard to compare results:
+```python
+from trulens.core import TruSession
+session = TruSession()
+session.run_dashboard()
+```
+
+---
+
+## 🔧 Key API: `utils.py`
+
+The `utils.py` module uses the **modern LlamaIndex v0.10+ `Settings` API** (the old `ServiceContext` is deprecated) and **TruLens v1.x** imports.
+
+### Configuration via dataclasses
+
+```python
+from utils import SentenceWindowConfig, AutoMergingConfig
+
+# Customize hyper-parameters with type-safe dataclasses
+sw_config = SentenceWindowConfig(
+    sentence_window_size=5,   # wider context window
+    similarity_top_k=8,       # retrieve more candidates before reranking
+    rerank_top_n=3,
+)
+
+am_config = AutoMergingConfig(
+    chunk_sizes=[4096, 1024, 256],  # deeper tree = smaller leaves = lower cost
+    similarity_top_k=15,
+)
+```
+
+### Building indexes
+
+```python
+from llama_index.llms.openai import OpenAI
+from utils import build_sentence_window_index, build_automerging_index
+
+llm = OpenAI(model="gpt-4o-mini", temperature=0.1)
+
+sw_index = build_sentence_window_index(documents, llm, config=sw_config)
+am_index = build_automerging_index(documents, llm, config=am_config)
+```
+
+### Getting query engines
+
+```python
+from utils import get_sentence_window_query_engine, get_automerging_query_engine
+
+sw_engine = get_sentence_window_query_engine(sw_index, config=sw_config)
+am_engine = get_automerging_query_engine(am_index, config=am_config)
+```
+
+### Running TruLens evaluation
+
+```python
+from trulens.core import TruSession
+from utils import get_prebuilt_trulens_recorder
+
+session = TruSession()
+session.reset_database()
+
+recorder = get_prebuilt_trulens_recorder(sw_engine, "Sentence Window", "v1")
+with recorder as recording:
+    for question in eval_questions:
+        sw_engine.query(question)
+
+session.run_dashboard()  # http://localhost:8501
+```
+
+---
+
+## 💡 Techniques at a Glance
+
+| Feature | Baseline RAG | Sentence-Window | Auto-Merging |
+|---------|-------------|-----------------|--------------|
+| **Chunk granularity** | Fixed-size | Per sentence | Hierarchical (multi-level) |
+| **Context at retrieval** | Chunk only | Sentence + window | Leaf → auto-merges to parent |
+| **Embedding level** | Chunk | Sentence | Leaf node |
+| **Re-ranking** | ✗ | ✓ BGE cross-encoder | ✓ BGE cross-encoder |
+| **Best for** | Quick prototyping | Dense, narrative text | Long docs, cost efficiency |
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
