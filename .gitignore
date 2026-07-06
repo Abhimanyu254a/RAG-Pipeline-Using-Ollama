@@ -1,0 +1,26 @@
+﻿# TruLens database — contains serialized API keys from run history
+*.sqlite
+default.sqlite
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Persisted index directories (large, regeneratable)
+sentence_index/
+merging_index/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
